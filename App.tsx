@@ -175,6 +175,15 @@ const App: React.FC = () => {
     saveScan(newScan);
     setScans(prev => [newScan, ...prev]);
     setSelectedScan(newScan);
+
+    // FIX: Set selected category so 'Back' button works and doesn't show white screen
+    const displayedSubject = (currentSubject === 'Lainnya' && customSubject) ? customSubject : currentSubject;
+    setSelectedCategory({
+        level: currentLevel,
+        subject: displayedSubject,
+        custom: currentSubject === 'Lainnya' ? customSubject : undefined
+    });
+
     setView(ViewState.SOLUTION);
 
     try {
@@ -192,7 +201,7 @@ const App: React.FC = () => {
       } else {
           solution = await generateTeacherQuestions(
               stagingImages,
-              stagingTexts,
+              stagingTexts, 
               apiKey,
               explanationStyle,
               currentLevel,
@@ -219,7 +228,12 @@ const App: React.FC = () => {
         deleteScan(id);
         setScans(prev => prev.filter(s => s.id !== id));
         if (selectedScan?.id === id) {
-            setView(ViewState.LIST_BY_CATEGORY); 
+             // Safe navigation back
+            if (selectedCategory) {
+                 setView(ViewState.LIST_BY_CATEGORY);
+            } else {
+                 setView(ViewState.CATEGORIES);
+            }
             setSelectedScan(null);
         }
     }
@@ -420,7 +434,10 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm">
-          <button onClick={() => setView(ViewState.LIST_BY_CATEGORY)} className="p-2 -ml-2 text-gray-600">
+          <button onClick={() => {
+              if (selectedCategory) setView(ViewState.LIST_BY_CATEGORY);
+              else setView(ViewState.CATEGORIES);
+          }} className="p-2 -ml-2 text-gray-600">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           <div className="flex flex-col items-center">
