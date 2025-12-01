@@ -6,16 +6,25 @@
     <title>Matematika Pintar AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- KaTeX for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    
     <style>
       body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-      .markdown-body h1 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; }
-      .markdown-body h2 { font-size: 1.25em; font-weight: bold; margin-bottom: 0.5em; }
-      .markdown-body p { margin-bottom: 0.75em; line-height: 1.6; }
-      .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
-      .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.75em; }
+      /* Markdown Styles */
+      .markdown-body { line-height: 1.6; color: #1f2937; }
       .markdown-body strong { font-weight: 700; color: #4338ca; }
-      .markdown-body code { background: #e0e7ff; padding: 2px 4px; rounded: 4px; font-family: monospace; }
-      .math-block { overflow-x: auto; padding: 10px; background: #f8fafc; border-radius: 4px; margin: 10px 0; }
+      .markdown-body h2 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; }
+      .markdown-body h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; color: #374151; }
+      .markdown-body ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+      .markdown-body ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+      .markdown-body li { margin-bottom: 0.25rem; }
+      .markdown-body blockquote { border-left: 4px solid #e5e7eb; padding-left: 1rem; margin-left: 0; color: #4b5563; font-style: italic; }
+      
+      /* Math Specific Overrides */
+      .katex { font-size: 1.1em; }
+      .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; }
     </style>
   <script type="importmap">
 {

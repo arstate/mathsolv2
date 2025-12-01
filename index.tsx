@@ -1,4 +1,4 @@
-import React, { ReactNode, ErrorInfo } from 'react';
+import React, { Component, ReactNode, ErrorInfo } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
@@ -12,27 +12,23 @@ interface ErrorBoundaryState {
 }
 
 // Error Boundary component to catch crashes and prevent white screen
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false, error: null };
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Critical App Error:", error, errorInfo);
   }
 
-  handleReset = () => {
+  private handleReset = () => {
     localStorage.clear();
     window.location.reload();
   }
 
-  render() {
+  public render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center font-sans">

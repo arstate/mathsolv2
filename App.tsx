@@ -148,6 +148,51 @@ const App: React.FC = () => {
     } catch (e) { return '-'; }
   };
 
+  // --- Helper: Advanced Rendering with KaTeX ---
+  const renderFormattedSolution = (text: string | undefined) => {
+    if (!text) return '';
+
+    // Step 1: Handle Block Math ($$ ... $$) or (\[ ... \])
+    // We try to use window.katex if available
+    let processed = text.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _open, texContent, _close) => {
+        try {
+            if ((window as any).katex) {
+                return (window as any).katex.renderToString(texContent, { displayMode: true, throwOnError: false });
+            }
+        } catch (e) { console.error(e); }
+        return `<div class="katex-display">${texContent}</div>`;
+    });
+
+    // Step 2: Handle Inline Math ($ ... $) or (\( ... \))
+    processed = processed.replace(/(\$|\\\()([^$\n]+?)(\$|\\\))/g, (_, _open, texContent, _close) => {
+        try {
+            if ((window as any).katex) {
+                return (window as any).katex.renderToString(texContent, { displayMode: false, throwOnError: false });
+            }
+        } catch (e) { console.error(e); }
+        return `<span class="katex">${texContent}</span>`;
+    });
+
+    // Step 3: Markdown Formatting
+    processed = processed
+        // Headers
+        .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Italic (careful not to break math that might have _)
+        .replace(/(?<!\\)_(.*?)_/g, '<em>$1</em>')
+        // Lists
+        .replace(/^\* (.*?)$/gm, '<ul><li>$1</li></ul>') // Basic list support
+        .replace(/^- (.*?)$/gm, '<ul><li>$1</li></ul>') 
+        .replace(/(<\/ul>\n<ul>)/g, '') // Merge adjacent lists
+        // Newlines to BR (but not inside HTML tags ideally, simplistic approach)
+        .replace(/\n/g, '<br/>');
+
+    return processed;
+  };
+
   // --- VIEWS ---
 
   if (!apiKey) return <ApiKeyInput onSave={handleSaveKey} />;
@@ -353,15 +398,11 @@ const App: React.FC = () => {
                         <h2 className="text-xl font-bold text-gray-900 m-0">Solusi</h2>
                     </div>
                 </div>
-                {/* Render markdown */}
+                {/* Render markdown with custom processor */}
                 <div 
                     className="markdown-body text-gray-800"
                     dangerouslySetInnerHTML={{ 
-                        __html: selectedScan.solution?.replace(/\n/g, '<br/>')
-                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                    .replace(/### (.*?)(<br\/>|$)/g, '<h2>$1</h2>')
-                                    .replace(/\\\[(.*?)\\\]/g, '<div class="math-block">$1</div>') // Basic Latex attempt
-                                    || '' 
+                        __html: renderFormattedSolution(selectedScan.solution)
                     }} 
                 />
               </div>

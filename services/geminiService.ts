@@ -28,18 +28,23 @@ export const solveMathProblem = async (
     }
 
     const prompt = `
-      Kamu adalah asisten ahli matematika.
-      Tugasmu adalah menganalisa gambar-gambar soal matematika yang diberikan.
-      User mungkin mengupload 1 gambar atau lebih (potongan soal). Gabungkan konteksnya jika perlu.
+      Kamu adalah asisten ahli matematika yang sangat cerdas.
+      Tugasmu adalah menganalisa gambar-gambar soal matematika yang diberikan dan memberikan solusinya.
       
       Instruksi Gaya Jawaban: ${styleInstruction}
 
-      Format Output:
-      1. Tulis ulang soalnya (jika terbaca).
-      2. Jika pilihan ganda, analisa opsi jawaban.
-      3. Berikan jawaban/penjelasan sesuai instruksi gaya di atas dalam Bahasa Indonesia.
-      4. Gunakan format Markdown (LaTeX untuk rumus matematik).
-      5. Jawaban Akhir harus dicetak TEBAL (Bold).
+      PENTING - Format Penulisan Matematika (LaTeX):
+      1. Gunakan simbol '$' tunggal untuk matematika dalam baris (inline). Contoh: $x^2 + 5$.
+      2. Gunakan simbol '$$' ganda untuk matematika blok (display/persamaan terpisah). Contoh: $$ \\frac{a}{b} = c $$.
+      3. JANGAN gunakan tanda kurung siku '\\[' atau '\\(' untuk LaTeX. Gunakan tanda dollar ($).
+      4. Gunakan Markdown standard untuk judul (##) dan bold (**teks**).
+
+      Format Output Jawaban:
+      1. **Analisis Soal**: Tulis ulang apa yang diketahui dan ditanya dari soal.
+      2. **Langkah Penyelesaian**: Jelaskan tahap demi tahap dengan jelas.
+      3. **Jawaban Akhir**: Tulis jawaban akhir dengan jelas dan cetak TEBAL.
+
+      Bahasa: Bahasa Indonesia.
     `;
 
     // Prepare content parts for multiple images
