@@ -6,6 +6,7 @@ import { ApiKeyInput } from './components/ApiKeyInput';
 import { CropModal } from './components/CropModal';
 import { TextInputModal } from './components/TextInputModal';
 import { SubjectSelector } from './components/SubjectSelector';
+import { ExplanationSelector } from './components/ExplanationSelector';
 import { ScanResult, ViewState, ExplanationStyle, EducationLevel, Subject } from './types';
 import { getScans, saveScan, updateScan, deleteScan, getUserPreferences, saveUserPreferences, UserPreferences } from './services/storageService';
 import { solveGeneralProblem } from './services/geminiService';
@@ -275,6 +276,11 @@ const App: React.FC = () => {
                     subject={currentSubject}
                     onLevelChange={handleLevelChange}
                     onSubjectChange={handleSubjectChange}
+                  />
+
+                  <ExplanationSelector 
+                    selected={explanationStyle}
+                    onSelect={setExplanationStyle}
                   />
 
                   {stagingImages.length === 0 && stagingTexts.length === 0 && (

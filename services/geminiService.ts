@@ -43,14 +43,19 @@ export const solveGeneralProblem = async (
 
     // Adjust style
     let styleInstruction = "";
-    if (style === 'brief') styleInstruction = "Jawab dengan ringkas dan padat.";
-    else if (style === 'direct') styleInstruction = "Langsung berikan kunci jawaban atau poin utamanya saja.";
-    else styleInstruction = "Berikan penjelasan langkah demi langkah yang komprehensif. Jika soal esai, berikan argumen yang kuat.";
+    if (style === 'brief') {
+        styleInstruction = "Jawab dengan ringkas dan padat. Berikan poin-poin penting saja tanpa penjelasan bertele-tele.";
+    } else if (style === 'direct') {
+        styleInstruction = "MODE: LANGSUNG JAWABAN. SANGAT PENTING: Jangan berikan kata pengantar, sapaan, atau penjelasan langkah-langkah. HANYA berikan jawaban akhir atau kunci jawaban. Jika soal pilihan ganda, tulis huruf dan teks jawabannya saja.";
+    } else {
+        // Detailed
+        styleInstruction = "Berikan penjelasan langkah demi langkah yang komprehensif. Jika soal hitungan, uraikan rumusnya. Jika soal esai, berikan argumen yang kuat dan latar belakang.";
+    }
 
     const prompt = `
       ${contextPrompt}
       
-      Instruksi Output: ${styleInstruction}
+      Instruksi Output Khusus: ${styleInstruction}
 
       PENTING - Format Penulisan:
       1. Jika ada rumus matematika/fisika/kimia, WAJIB gunakan LaTeX format:
