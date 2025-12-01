@@ -1,97 +1,72 @@
 import { GoogleGenAI } from "@google/genai";
 import { ExplanationStyle } from "../types";
 
-// Helper untuk membersihkan base64
-const prepareImagePart = (base64String: string) => {
-  // Deteksi MimeType dari string data:image/...
-  const mimeMatch = base64String.match(/^data:(image\/[a-zA-Z+]+);base64,/);
-  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  
-  // Bersihkan header untuk mendapatkan data raw
-  const data = base64String.replace(/^data:image\/[a-zA-Z+]+;base64,/, "");
-  
-  return {
-    inlineData: {
-      mimeType,
-      data
-    }
-  };
-};
-
 export const solveMathProblem = async (
   images: string[], 
   apiKey: string,
   style: ExplanationStyle
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key kosong. Silakan input ulang.");
-  if (!images || images.length === 0) throw new Error("Tidak ada gambar untuk diproses.");
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  // Instruksi gaya jawaban
-  let styleInstruction = "";
-  switch (style) {
-    case 'brief':
-      styleInstruction = "Jawab dengan SINGKAT dan PADAT. Langsung ke inti penyelesaian.";
-      break;
-    case 'direct':
-      styleInstruction = "Hanya berikan JAWABAN AKHIR (Kunci Jawaban). Tanpa penjelasan.";
-      break;
-    case 'detailed':
-    default:
-      styleInstruction = "Berikan langkah penyelesaian yang SANGAT RINCI, tahap demi tahap, jelaskan rumus yang dipakai.";
-      break;
-  }
-
-  const prompt = `
-    Kamu adalah guru matematika ahli.
-    Tugas: Selesaikan soal matematika dari gambar yang diberikan.
-    
-    Instruksi Khusus:
-    1. ${styleInstruction}
-    2. Jika ada banyak gambar, anggap itu satu kesatuan soal (sambungan).
-    3. Gunakan Bahasa Indonesia.
-    4. Gunakan format Markdown / LaTeX yang rapi untuk rumus.
-    5. Cetak tebal jawaban akhir.
-  `;
-
-  const imageParts = images.map(prepareImagePart);
-
-  // Strategi Fallback Model:
-  // Coba model terbaru (2.5), jika gagal coba model stabil (1.5)
   try {
-    try {
-      // Percobaan 1: Gemini 2.5 Flash (Terbaru)
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: {
-          parts: [...imageParts, { text: prompt }]
-        }
-      });
-      return response.text || "Tidak ada respons teks dari AI (Model 2.5).";
+    if (!apiKey) throw new Error("API Key tidak ditemukan.");
+    if (!images || images.length === 0) throw new Error("Tidak ada gambar untuk diproses.");
 
-    } catch (err25) {
-      console.warn("Gemini 2.5 gagal, mencoba fallback ke 1.5...", err25);
-      
-      // Percobaan 2: Gemini 1.5 Flash (Stabil / Versi Lama)
-      const responseFallback = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: {
-          parts: [...imageParts, { text: prompt }]
-        }
-      });
-      return responseFallback.text || "Tidak ada respons teks dari AI (Model 1.5).";
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Define style instruction
+    let styleInstruction = "";
+    switch (style) {
+      case 'brief':
+        styleInstruction = "Berikan penjelasan yang singkat, padat, dan langsung pada intinya. Jangan terlalu bertele-tele.";
+        break;
+      case 'direct':
+        styleInstruction = "Hanya berikan jawaban akhir (kunci jawaban) saja. Jangan berikan penjelasan langkah-langkah.";
+        break;
+      case 'detailed':
+      default:
+        styleInstruction = "Berikan langkah-langkah penyelesaian yang sangat rinci, jabarkan setiap konsep, rumus yang digunakan, dan logika di balik setiap langkah.";
+        break;
     }
-  } catch (finalError: any) {
-    console.error("Critical AI Error:", finalError);
-    // Tampilkan pesan error ASLI dari Google agar user tau penyebabnya
-    let errorMessage = finalError.message || "Terjadi kesalahan tidak diketahui.";
-    
-    if (errorMessage.includes("400")) errorMessage += " (Request Invalid - Coba crop gambar lebih rapi)";
-    if (errorMessage.includes("403")) errorMessage += " (API Key Ditolak / Lokasi Dilarang)";
-    if (errorMessage.includes("404")) errorMessage += " (Model AI Sedang Gangguan)";
-    if (errorMessage.includes("500")) errorMessage += " (Server Google Error)";
 
-    throw new Error(errorMessage);
+    const prompt = `
+      Kamu adalah asisten ahli matematika.
+      Tugasmu adalah menganalisa gambar-gambar soal matematika yang diberikan.
+      User mungkin mengupload 1 gambar atau lebih (potongan soal). Gabungkan konteksnya jika perlu.
+      
+      Instruksi Gaya Jawaban: ${styleInstruction}
+
+      Format Output:
+      1. Tulis ulang soalnya (jika terbaca).
+      2. Jika pilihan ganda, analisa opsi jawaban.
+      3. Berikan jawaban/penjelasan sesuai instruksi gaya di atas dalam Bahasa Indonesia.
+      4. Gunakan format Markdown (LaTeX untuk rumus matematik).
+      5. Jawaban Akhir harus dicetak TEBAL (Bold).
+    `;
+
+    // Prepare content parts for multiple images
+    const imageParts = images.map(img => {
+      // Clean base64 header if exists
+      const cleanBase64 = img.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+      return {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: cleanBase64
+        }
+      };
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          ...imageParts,
+          { text: prompt }
+        ]
+      }
+    });
+
+    return response.text || "Maaf, saya tidak dapat menghasilkan jawaban saat ini.";
+  } catch (error) {
+    console.error("Error calling Gemini:", error);
+    return "Maaf, terjadi kesalahan saat menghubungkan ke kecerdasan AI. Periksa kembali API Key Anda atau koneksi internet.";
   }
 };
