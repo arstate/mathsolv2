@@ -1,5 +1,5 @@
 {
-  "name": "Matematika Pintar AI",
+  "name": "Matematika Pintar AI2",
   "description": "Aplikasi pemecah soal matematika berbasis AI menggunakan kamera dan Gemini.",
   "requestFramePermissions": [
     "camera"
