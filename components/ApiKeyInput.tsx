@@ -59,7 +59,7 @@ export const ApiKeyInput: React.FC<Props> = ({ onSave }) => {
         </form>
         
         <p className="mt-6 text-xs text-center text-gray-400">
-            Key Anda tersimpan aman di browser perangkat ini.
+            Demi keamanan & mencegah error, Key akan terhapus otomatis saat Anda refresh halaman atau menutup browser.
         </p>
       </div>
     </div>

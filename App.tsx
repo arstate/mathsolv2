@@ -20,25 +20,21 @@ const App: React.FC = () => {
   // File Input Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // API Key State
+  // API Key State (Temporary / Session Only)
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isCheckingKey, setIsCheckingKey] = useState(true);
 
   useEffect(() => {
+    // Hanya memuat riwayat soal, TIDAK memuat API Key dari storage
     setScans(getScans());
-    const storedKey = localStorage.getItem('gemini_api_key');
-    if (storedKey) setApiKey(storedKey);
-    setIsCheckingKey(false);
   }, []);
 
   const handleSaveKey = (key: string) => {
-    localStorage.setItem('gemini_api_key', key);
+    // Simpan ke state saja (hilang saat refresh)
     setApiKey(key);
   };
 
   const handleResetKey = () => {
-    if (confirm("Hapus API Key?")) {
-        localStorage.removeItem('gemini_api_key');
+    if (confirm("Reset API Key untuk sesi ini?")) {
         setApiKey(null);
         setView(ViewState.LIST);
     }
@@ -139,7 +135,6 @@ const App: React.FC = () => {
 
   // --- VIEWS ---
 
-  if (isCheckingKey) return <div className="p-10 text-center">Loading...</div>;
   if (!apiKey) return <ApiKeyInput onSave={handleSaveKey} />;
 
   // 1. CROP VIEW (Overlay)
