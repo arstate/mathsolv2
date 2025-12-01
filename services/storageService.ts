@@ -7,6 +7,7 @@ const PREF_KEY = 'edu_solver_prefs';
 export interface UserPreferences {
   level: EducationLevel;
   subject: Subject;
+  customSubject?: string;
 }
 
 // --- Preferences ---
@@ -55,7 +56,8 @@ export const getScans = (): ScanResult[] => {
              timestamp: item.timestamp || Date.now(),
              // Backward compatibility defaults
              educationLevel: item.educationLevel || 'Auto',
-             subject: item.subject || 'Auto'
+             subject: item.subject || 'Auto',
+             mode: item.mode || 'student' // Default old data to student
           };
       });
     }
@@ -70,7 +72,7 @@ export const getScans = (): ScanResult[] => {
 export const saveScan = (scan: ScanResult): void => {
   try {
     const currentScans = getScans();
-    const updatedScans = [scan, ...currentScans].slice(0, 50); // Increased limit slightly
+    const updatedScans = [scan, ...currentScans].slice(0, 50); // Limit 50 items
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedScans));
   } catch (e) {
     console.error("Gagal menyimpan riwayat:", e);

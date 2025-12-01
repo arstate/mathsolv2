@@ -18,9 +18,13 @@ export type Subject =
   | 'Coding/TI'
   | 'Lainnya';
 
+export type AppMode = 'student' | 'teacher';
+
 export interface ScanResult {
   id: string;
   timestamp: number;
+  mode: AppMode; // 'student' or 'teacher'
+  
   images: string[];
   textInputs?: string[]; 
   explanationStyle: ExplanationStyle;
@@ -28,6 +32,10 @@ export interface ScanResult {
   // New Fields for General Education
   educationLevel: EducationLevel;
   subject: Subject;
+  customSubject?: string; // For manual input if subject is 'Lainnya'
+  
+  // Teacher specific
+  questionCount?: number;
 
   solution?: string;
   loading: boolean;
