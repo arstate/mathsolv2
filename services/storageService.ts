@@ -5,9 +5,31 @@ const STORAGE_KEY = 'math_solver_scans';
 export const getScans = (): ScanResult[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+
+    // Migration Logic: Ensure all items have the 'images' array property
+    if (Array.isArray(parsed)) {
+      return parsed.map((item: any) => {
+        // Fix for old version which used 'imageUrl' instead of 'images' array
+        if (!item.images && item.imageUrl) {
+          return { 
+            ...item, 
+            images: [item.imageUrl] // Convert single string to array
+          };
+        }
+        // Fallback for corrupted items with no images
+        if (!item.images) {
+            return { ...item, images: [] };
+        }
+        return item;
+      });
+    }
+    return [];
   } catch (e) {
     console.error("Gagal memuat riwayat:", e);
+    // If JSON is corrupt, return empty to prevent crash
     return [];
   }
 };
@@ -41,4 +63,9 @@ export const deleteScan = (id: string): void => {
     const currentScans = getScans();
     const updated = currentScans.filter(s => s.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-}
+};
+
+// Emergency function to clear data if app is totally broken
+export const clearAllScans = (): void => {
+    localStorage.removeItem(STORAGE_KEY);
+};

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
+import { clearAllScans } from '../services/storageService';
 
 interface Props {
   onSave: (key: string) => void;
@@ -11,6 +12,13 @@ export const ApiKeyInput: React.FC<Props> = ({ onSave }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (key.trim()) onSave(key.trim());
+  };
+
+  const handleClearData = () => {
+    if (confirm("Apakah anda yakin ingin menghapus semua histori soal? Ini bisa memperbaiki error layar putih.")) {
+        clearAllScans();
+        alert("Data berhasil dihapus. Silakan coba masukkan API Key lagi.");
+    }
   };
 
   return (
@@ -58,9 +66,17 @@ export const ApiKeyInput: React.FC<Props> = ({ onSave }) => {
             <Button type="submit" fullWidth disabled={!key.trim()}>Mulai Sekarang</Button>
         </form>
         
-        <p className="mt-6 text-xs text-center text-gray-400">
-            Demi keamanan & mencegah error, Key akan terhapus otomatis saat Anda refresh halaman atau menutup browser.
-        </p>
+        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400 mb-3">
+                Key akan terhapus otomatis saat refresh halaman.
+            </p>
+            <button 
+                onClick={handleClearData}
+                className="text-xs text-red-400 hover:text-red-600 underline"
+            >
+                Mengalami error layar putih? Hapus Data Histori
+            </button>
+        </div>
       </div>
     </div>
   );

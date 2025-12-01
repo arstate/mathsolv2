@@ -291,16 +291,21 @@ const App: React.FC = () => {
           {/* Images Section (Horizontal Scroll if multiple) */}
           <div className="bg-gray-100 p-4">
              <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
-                 {selectedScan.images.map((img, i) => (
-                    <img 
-                        key={i}
-                        src={img} 
-                        alt={`Soal ${i+1}`} 
-                        className="h-64 rounded-lg shadow-md border border-gray-300 object-contain bg-white snap-center"
-                    />
-                 ))}
+                 {/* SAFE GUARD: Use optional chaining to prevent crash on undefined images */}
+                 {selectedScan.images && selectedScan.images.length > 0 ? (
+                    selectedScan.images.map((img, i) => (
+                        <img 
+                            key={i}
+                            src={img} 
+                            alt={`Soal ${i+1}`} 
+                            className="h-64 rounded-lg shadow-md border border-gray-300 object-contain bg-white snap-center"
+                        />
+                    ))
+                 ) : (
+                    <div className="h-32 w-full flex items-center justify-center text-gray-400 text-sm">Gambar tidak tersedia</div>
+                 )}
              </div>
-             {selectedScan.images.length > 1 && (
+             {selectedScan.images && selectedScan.images.length > 1 && (
                  <p className="text-center text-xs text-gray-500 mt-2">Geser untuk melihat semua foto soal</p>
              )}
           </div>
@@ -401,8 +406,13 @@ const App: React.FC = () => {
                             className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow cursor-pointer active:bg-gray-50"
                         >
                             <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
-                                <img src={scan.images[0]} className="w-full h-full object-cover" alt="thumbnail" />
-                                {scan.images.length > 1 && (
+                                {/* SAFE GUARD: Use optional chaining scan.images?.[0] */}
+                                <img 
+                                    src={scan.images?.[0] || 'https://via.placeholder.com/80?text=Error'} 
+                                    className="w-full h-full object-cover" 
+                                    alt="thumbnail" 
+                                />
+                                {scan.images && scan.images.length > 1 && (
                                     <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">
                                         +{scan.images.length - 1}
                                     </div>
