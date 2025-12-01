@@ -110,8 +110,8 @@ const App: React.FC = () => {
       setScans(prev => prev.map(s => s.id === newId ? { ...s, ...updates } : s));
     } catch (err) {
       console.error(err);
-      const errorMsg = err instanceof Error ? err.message : "Terjadi kesalahan";
-      const errorUpdate = { loading: false, error: "Gagal: " + errorMsg };
+      const errorMsg = err instanceof Error ? err.message : "Terjadi kesalahan tidak diketahui";
+      const errorUpdate = { loading: false, error: errorMsg };
       updateScan(newId, errorUpdate);
       setSelectedScan(prev => prev && prev.id === newId ? { ...prev, ...errorUpdate } : prev);
     }
@@ -325,9 +325,15 @@ const App: React.FC = () => {
                  </div>
                </div>
             ) : selectedScan.error ? (
-              <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100">
-                <p className="font-bold">Gagal:</p>
-                <p>{selectedScan.error}</p>
+              <div className="bg-red-50 text-red-800 p-4 rounded-xl border border-red-100 text-sm">
+                <div className="flex items-center gap-2 mb-2 font-bold text-red-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    Gagal Mengerjakan
+                </div>
+                <p className="font-mono bg-red-100 p-2 rounded break-all">{selectedScan.error}</p>
+                <p className="mt-2 text-xs opacity-75">Saran: Cek API Key, koneksi internet, atau coba potong gambar lebih fokus ke teks soal.</p>
               </div>
             ) : (
               <div className="prose prose-indigo max-w-none">
