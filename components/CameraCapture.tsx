@@ -6,11 +6,25 @@ interface CameraCaptureProps {
   onCancel: () => void;
 }
 
+interface ZoomCapabilities {
+  min: number;
+  max: number;
+  step: number;
+}
+
 export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCancel }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string>('');
+  
+  // Zoom State
+  const [zoom, setZoom] = useState<number>(1);
+  const [zoomCap, setZoomCap] = useState<ZoomCapabilities | null>(null);
+  
+  // Pinch Gesture State
+  const [pinchStartDist, setPinchStartDist] = useState<number>(0);
+  const [pinchStartZoom, setPinchStartZoom] = useState<number>(1);
 
   useEffect(() => {
     startCamera();
@@ -35,6 +49,21 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
+
+      // Check Zoom Capabilities
+      const track = mediaStream.getVideoTracks()[0];
+      // Type assertion because getCapabilities isn't always fully typed in all TS envs
+      const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+
+      if (capabilities.zoom) {
+        setZoomCap({
+          min: capabilities.zoom.min,
+          max: capabilities.zoom.max,
+          step: capabilities.zoom.step
+        });
+        setZoom(capabilities.zoom.min);
+      }
+
     } catch (err) {
       console.error("Camera Error:", err);
       setError("Tidak dapat mengakses kamera. Pastikan izin diberikan.");
@@ -47,6 +76,59 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
       setStream(null);
     }
   };
+
+  const handleZoom = (value: number) => {
+    if (!stream || !zoomCap) return;
+    
+    // Clamp value
+    const newZoom = Math.min(Math.max(value, zoomCap.min), zoomCap.max);
+    setZoom(newZoom);
+
+    const track = stream.getVideoTracks()[0];
+    const constraints = { advanced: [{ zoom: newZoom }] } as any;
+    
+    track.applyConstraints(constraints).catch(err => {
+      console.log("Zoom not supported directly:", err);
+    });
+  };
+
+  // --- Pinch to Zoom Logic ---
+
+  const getPinchDistance = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) return 0;
+    const t1 = e.touches[0];
+    const t2 = e.touches[1];
+    // Pythagoras theorem
+    return Math.sqrt(
+      Math.pow(t1.clientX - t2.clientX, 2) + 
+      Math.pow(t1.clientY - t2.clientY, 2)
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      setPinchStartDist(getPinchDistance(e));
+      setPinchStartZoom(zoom);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && zoomCap) {
+      const currentDist = getPinchDistance(e);
+      if (pinchStartDist > 0) {
+        // Sensitivity factor
+        const scale = currentDist / pinchStartDist;
+        // Calculate raw zoom change
+        // We map the pinch ratio to the zoom range roughly
+        const range = zoomCap.max - zoomCap.min;
+        const delta = (scale - 1) * range * 0.5; // 0.5 is sensitivity dampener
+        
+        handleZoom(pinchStartZoom + delta);
+      }
+    }
+  };
+
+  // --- Capture ---
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -81,7 +163,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black z-50 flex flex-col touch-none"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
       <div className="relative flex-1 bg-black overflow-hidden">
         <video 
           ref={videoRef} 
@@ -99,24 +185,51 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
                 <div className="absolute left-2/3 h-full w-px bg-white/50"></div>
             </div>
         </div>
+
+        {/* Zoom Feedback Overlay (Optional) */}
+        {zoomCap && (
+           <div className="absolute top-4 right-4 bg-black/50 text-white px-2 py-1 rounded text-sm font-mono pointer-events-none">
+             {zoom.toFixed(1)}x
+           </div>
+        )}
       </div>
 
-      <div className="bg-gray-900 p-6 pb-8 flex items-center justify-between">
-        <button 
-            onClick={onCancel}
-            className="text-white p-4 rounded-full hover:bg-white/10"
-        >
-            Batal
-        </button>
+      <div className="bg-gray-900 p-6 pb-8 pt-2 flex flex-col items-center gap-4">
         
-        <button 
-            onClick={handleCapture}
-            className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-95 transition-transform"
-        >
-            <div className="w-16 h-16 bg-white rounded-full"></div>
-        </button>
+        {/* Zoom Slider */}
+        {zoomCap && (
+          <div className="w-full max-w-xs flex items-center gap-3 px-4 mb-2">
+             <span className="text-white text-xs">1x</span>
+             <input 
+                type="range" 
+                min={zoomCap.min} 
+                max={zoomCap.max} 
+                step={zoomCap.step || 0.1}
+                value={zoom}
+                onChange={(e) => handleZoom(parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+             />
+             <span className="text-white text-xs">{zoomCap.max}x</span>
+          </div>
+        )}
 
-        <div className="w-12"></div> {/* Spacer for alignment */}
+        <div className="flex items-center justify-between w-full">
+            <button 
+                onClick={onCancel}
+                className="text-white p-4 rounded-full hover:bg-white/10"
+            >
+                Batal
+            </button>
+            
+            <button 
+                onClick={handleCapture}
+                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-95 transition-transform"
+            >
+                <div className="w-16 h-16 bg-white rounded-full"></div>
+            </button>
+
+            <div className="w-12"></div> {/* Spacer for alignment */}
+        </div>
       </div>
       
       <canvas ref={canvasRef} className="hidden" />
