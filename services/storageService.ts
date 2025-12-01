@@ -9,43 +9,51 @@ export const getScans = (): ScanResult[] => {
 
     const parsed = JSON.parse(stored);
 
-    // Migration Logic: Ensure all items have the 'images' array property
     if (Array.isArray(parsed)) {
-      return parsed.map((item: any) => {
-        // Fix for old version which used 'imageUrl' instead of 'images' array
-        if (!item.images && item.imageUrl) {
-          return { 
-            ...item, 
-            images: [item.imageUrl] // Convert single string to array
+      // Filter out nulls and fix structure
+      return parsed
+        .filter((item) => item !== null && typeof item === 'object')
+        .map((item: any) => {
+          // Force 'images' to be an array
+          let fixedImages: string[] = [];
+          
+          if (Array.isArray(item.images)) {
+             fixedImages = item.images;
+          } else if (typeof item.imageUrl === 'string') {
+             fixedImages = [item.imageUrl]; // Migrate old single image
+          }
+
+          return {
+             ...item,
+             images: fixedImages,
+             // Ensure ID exists
+             id: item.id || Date.now().toString() + Math.random().toString(),
+             timestamp: item.timestamp || Date.now()
           };
-        }
-        // Fallback for corrupted items with no images
-        if (!item.images) {
-            return { ...item, images: [] };
-        }
-        return item;
       });
     }
     return [];
   } catch (e) {
-    console.error("Gagal memuat riwayat:", e);
-    // If JSON is corrupt, return empty to prevent crash
+    console.error("Gagal memuat riwayat (Data Corrupt):", e);
+    // Auto-clear corrupt data to fix white screen loop
+    localStorage.removeItem(STORAGE_KEY);
     return [];
   }
 };
 
 export const saveScan = (scan: ScanResult): void => {
-  const currentScans = getScans();
-  // Add new scan to the beginning
-  const updatedScans = [scan, ...currentScans];
   try {
+    const currentScans = getScans();
+    const updatedScans = [scan, ...currentScans].slice(0, 30); // Limit to 30 items
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedScans));
   } catch (e) {
     console.error("Gagal menyimpan riwayat:", e);
-    // Handle quota exceeded if necessary by removing old items, strictly not required for MVP
-    if (updatedScans.length > 20) {
-        const trimmed = updatedScans.slice(0, 20);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    // If quota exceeded, try clearing old data
+    try {
+        const minimalScans = [scan];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalScans));
+    } catch(err) {
+        console.error("Critical storage failure");
     }
   }
 };
@@ -65,7 +73,6 @@ export const deleteScan = (id: string): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 };
 
-// Emergency function to clear data if app is totally broken
 export const clearAllScans = (): void => {
     localStorage.removeItem(STORAGE_KEY);
 };

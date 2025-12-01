@@ -110,7 +110,8 @@ const App: React.FC = () => {
       setScans(prev => prev.map(s => s.id === newId ? { ...s, ...updates } : s));
     } catch (err) {
       console.error(err);
-      const errorUpdate = { loading: false, error: "Gagal memproses." };
+      const errorMsg = err instanceof Error ? err.message : "Terjadi kesalahan";
+      const errorUpdate = { loading: false, error: "Gagal: " + errorMsg };
       updateScan(newId, errorUpdate);
       setSelectedScan(prev => prev && prev.id === newId ? { ...prev, ...errorUpdate } : prev);
     }
@@ -128,9 +129,11 @@ const App: React.FC = () => {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('id-ID', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-    });
+    try {
+        return new Date(timestamp).toLocaleDateString('id-ID', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+    } catch (e) { return '-'; }
   };
 
   // --- VIEWS ---
@@ -186,7 +189,7 @@ const App: React.FC = () => {
                                   <img src={img} alt={`scan-${idx}`} className="w-full h-full object-cover" />
                                   <button 
                                     onClick={() => removeStagingImage(idx)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
+                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-sm"
                                   >
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -246,6 +249,7 @@ const App: React.FC = () => {
                         ref={fileInputRef} 
                         className="hidden" 
                         accept="image/*" 
+                        multiple 
                         onChange={handleFileUpload}
                       />
                   </div>
@@ -292,7 +296,7 @@ const App: React.FC = () => {
           <div className="bg-gray-100 p-4">
              <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
                  {/* SAFE GUARD: Use optional chaining to prevent crash on undefined images */}
-                 {selectedScan.images && selectedScan.images.length > 0 ? (
+                 {Array.isArray(selectedScan.images) && selectedScan.images.length > 0 ? (
                     selectedScan.images.map((img, i) => (
                         <img 
                             key={i}
@@ -302,10 +306,10 @@ const App: React.FC = () => {
                         />
                     ))
                  ) : (
-                    <div className="h-32 w-full flex items-center justify-center text-gray-400 text-sm">Gambar tidak tersedia</div>
+                    <div className="h-32 w-full flex items-center justify-center text-gray-400 text-sm">Gambar tidak tersedia (Corrupt Data)</div>
                  )}
              </div>
-             {selectedScan.images && selectedScan.images.length > 1 && (
+             {Array.isArray(selectedScan.images) && selectedScan.images.length > 1 && (
                  <p className="text-center text-xs text-gray-500 mt-2">Geser untuk melihat semua foto soal</p>
              )}
           </div>
@@ -315,14 +319,15 @@ const App: React.FC = () => {
             {selectedScan.loading ? (
                <div className="flex flex-col items-center justify-center py-12 space-y-4">
                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                 <p className="text-gray-500 font-medium animate-pulse">AI sedang berpikir...</p>
+                 <p className="text-gray-500 font-medium animate-pulse">AI sedang mengerjakan...</p>
                  <div className="flex gap-2">
                     <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-500">Mode: {selectedScan.explanationStyle}</span>
                  </div>
                </div>
             ) : selectedScan.error ? (
               <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100">
-                {selectedScan.error}
+                <p className="font-bold">Gagal:</p>
+                <p>{selectedScan.error}</p>
               </div>
             ) : (
               <div className="prose prose-indigo max-w-none">
@@ -362,7 +367,7 @@ const App: React.FC = () => {
 
   // 5. LIST VIEW (Home)
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col max-w-lg mx-auto shadow-2xl">
+    <div className="min-h-screen bg-gray-50 flex flex-col max-w-lg mx-auto shadow-2xl border-x border-gray-100">
         {/* Top Bar */}
         <div className="bg-white px-6 py-5 shadow-sm border-b border-gray-200 z-10 sticky top-0 flex justify-between items-center">
             <div>
@@ -375,7 +380,7 @@ const App: React.FC = () => {
             <button 
                 onClick={handleResetKey}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Ganti API Key"
+                title="Ganti API Key / Reset"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -406,16 +411,22 @@ const App: React.FC = () => {
                             className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow cursor-pointer active:bg-gray-50"
                         >
                             <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
-                                {/* SAFE GUARD: Use optional chaining scan.images?.[0] */}
-                                <img 
-                                    src={scan.images?.[0] || 'https://via.placeholder.com/80?text=Error'} 
-                                    className="w-full h-full object-cover" 
-                                    alt="thumbnail" 
-                                />
-                                {scan.images && scan.images.length > 1 && (
-                                    <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">
-                                        +{scan.images.length - 1}
-                                    </div>
+                                {/* Extra Safe Guard against corrupt data */}
+                                {Array.isArray(scan.images) && scan.images.length > 0 ? (
+                                    <>
+                                        <img 
+                                            src={scan.images[0]} 
+                                            className="w-full h-full object-cover" 
+                                            alt="thumbnail" 
+                                        />
+                                        {scan.images.length > 1 && (
+                                            <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">
+                                                +{scan.images.length - 1}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Img</div>
                                 )}
                             </div>
                             <div className="flex-1 flex flex-col justify-center">
