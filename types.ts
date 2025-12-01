@@ -5,6 +5,8 @@ export interface ScanResult {
   timestamp: number;
   // Changed from single imageUrl to array
   images: string[];
+  // New field for text-based questions
+  textInputs?: string[]; 
   explanationStyle: ExplanationStyle;
   solution?: string;
   loading: boolean;

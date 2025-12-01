@@ -3,6 +3,7 @@ import { CameraCapture } from './components/CameraCapture';
 import { Button } from './components/Button';
 import { ApiKeyInput } from './components/ApiKeyInput';
 import { CropModal } from './components/CropModal';
+import { TextInputModal } from './components/TextInputModal';
 import { ScanResult, ViewState, ExplanationStyle } from './types';
 import { getScans, saveScan, updateScan, deleteScan } from './services/storageService';
 import { solveMathProblem } from './services/geminiService';
@@ -14,7 +15,10 @@ const App: React.FC = () => {
   
   // Staging State (New Feature)
   const [stagingImages, setStagingImages] = useState<string[]>([]);
+  const [stagingTexts, setStagingTexts] = useState<string[]>([]); // New state for text
   const [tempImageForCrop, setTempImageForCrop] = useState<string | null>(null);
+  const [showTextModal, setShowTextModal] = useState(false); // Modal visibility
+  
   const [explanationStyle, setExplanationStyle] = useState<ExplanationStyle>('detailed');
   
   // File Input Ref
@@ -56,6 +60,7 @@ const App: React.FC = () => {
 
   const startNewSession = () => {
     setStagingImages([]);
+    setStagingTexts([]);
     setExplanationStyle('detailed');
     setView(ViewState.STAGING);
   };
@@ -82,8 +87,8 @@ const App: React.FC = () => {
 
   const handleCropConfirm = (croppedData: string) => {
     // Add to staging
-    if (stagingImages.length >= 30) {
-        alert("Maksimal 30 gambar.");
+    if (stagingImages.length >= 10) { // Limit reasonable amount
+        alert("Maksimal 10 gambar per sesi.");
         return;
     }
     setStagingImages(prev => [...prev, croppedData]);
@@ -95,16 +100,32 @@ const App: React.FC = () => {
     setStagingImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  // --- Text Input Logic ---
+
+  const handleAddText = (text: string) => {
+    setStagingTexts(prev => [...prev, text]);
+    setShowTextModal(false);
+  };
+
+  const removeStagingText = (index: number) => {
+    setStagingTexts(prev => prev.filter((_, i) => i !== index));
+  };
+
   // --- Solving Logic ---
 
   const handleProcessStaging = async () => {
-    if (!apiKey || stagingImages.length === 0) return;
+    if (!apiKey) return;
+    if (stagingImages.length === 0 && stagingTexts.length === 0) {
+        alert("Mohon masukkan minimal satu gambar atau satu teks soal.");
+        return;
+    }
 
     const newId = Date.now().toString();
     const newScan: ScanResult = {
       id: newId,
       timestamp: Date.now(),
       images: stagingImages,
+      textInputs: stagingTexts,
       explanationStyle,
       loading: true,
     };
@@ -115,7 +136,7 @@ const App: React.FC = () => {
     setView(ViewState.SOLUTION);
 
     try {
-      const solution = await solveMathProblem(stagingImages, apiKey, explanationStyle);
+      const solution = await solveMathProblem(stagingImages, stagingTexts, apiKey, explanationStyle);
       const updates = { solution, loading: false };
       updateScan(newId, updates);
       setSelectedScan(prev => prev && prev.id === newId ? { ...prev, ...updates } : prev);
@@ -153,7 +174,6 @@ const App: React.FC = () => {
     if (!text) return '';
 
     // Step 1: Handle Block Math ($$ ... $$) or (\[ ... \])
-    // We try to use window.katex if available
     let processed = text.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _open, texContent, _close) => {
         try {
             if ((window as any).katex) {
@@ -181,13 +201,13 @@ const App: React.FC = () => {
         .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
         // Bold
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        // Italic (careful not to break math that might have _)
+        // Italic
         .replace(/(?<!\\)_(.*?)_/g, '<em>$1</em>')
         // Lists
-        .replace(/^\* (.*?)$/gm, '<ul><li>$1</li></ul>') // Basic list support
+        .replace(/^\* (.*?)$/gm, '<ul><li>$1</li></ul>') 
         .replace(/^- (.*?)$/gm, '<ul><li>$1</li></ul>') 
         .replace(/(<\/ul>\n<ul>)/g, '') // Merge adjacent lists
-        // Newlines to BR (but not inside HTML tags ideally, simplistic approach)
+        // Newlines to BR
         .replace(/\n/g, '<br/>');
 
     return processed;
@@ -222,6 +242,13 @@ const App: React.FC = () => {
   if (view === ViewState.STAGING) {
       return (
           <div className="min-h-screen bg-white flex flex-col">
+              {showTextModal && (
+                <TextInputModal 
+                    onConfirm={handleAddText}
+                    onCancel={() => setShowTextModal(false)}
+                />
+              )}
+
               <div className="bg-white border-b px-4 py-3 flex items-center shadow-sm z-10">
                   <button onClick={() => setView(ViewState.LIST)} className="mr-3 text-gray-500">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -229,33 +256,54 @@ const App: React.FC = () => {
                     </svg>
                   </button>
                   <h1 className="font-bold text-lg">Buat Pertanyaan</h1>
-                  <span className="ml-auto text-sm text-gray-500">{stagingImages.length}/30</span>
+                  <span className="ml-auto text-sm text-gray-500">Item: {stagingImages.length + stagingTexts.length}</span>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 pb-32">
-                  {/* Image Grid */}
-                  {stagingImages.length === 0 ? (
-                      <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
-                          <p>Belum ada foto soal</p>
-                          <p className="text-xs mt-1">Tekan tombol kamera atau upload di bawah</p>
-                      </div>
-                  ) : (
-                      <div className="grid grid-cols-3 gap-2 mb-6">
-                          {stagingImages.map((img, idx) => (
-                              <div key={idx} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                                  <img src={img} alt={`scan-${idx}`} className="w-full h-full object-cover" />
-                                  <button 
-                                    onClick={() => removeStagingImage(idx)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-sm"
-                                  >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                      </svg>
-                                  </button>
-                              </div>
-                          ))}
+                  {/* Empty State */}
+                  {stagingImages.length === 0 && stagingTexts.length === 0 && (
+                      <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl mb-4">
+                          <p>Belum ada soal (Foto/Teks)</p>
+                          <p className="text-xs mt-1">Gunakan tombol di bawah untuk menambah soal</p>
                       </div>
                   )}
+
+                  {/* Mixed Grid for Images and Text */}
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                      {/* Render Images */}
+                      {stagingImages.map((img, idx) => (
+                          <div key={`img-${idx}`} className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                              <img src={img} alt={`scan-${idx}`} className="w-full h-full object-cover" />
+                              <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Foto #{idx+1}</div>
+                              <button 
+                                onClick={() => removeStagingImage(idx)}
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600 transition-colors"
+                              >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                              </button>
+                          </div>
+                      ))}
+
+                      {/* Render Texts */}
+                      {stagingTexts.map((txt, idx) => (
+                          <div key={`txt-${idx}`} className="relative aspect-square bg-yellow-50 rounded-xl border border-yellow-200 shadow-sm p-3 flex flex-col">
+                              <div className="flex-1 overflow-hidden">
+                                <p className="text-xs font-mono text-yellow-800 mb-1">Teks #{idx+1}</p>
+                                <p className="text-sm text-gray-700 line-clamp-4 leading-relaxed font-medium">"{txt}"</p>
+                              </div>
+                              <button 
+                                onClick={() => removeStagingText(idx)}
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600 transition-colors"
+                              >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                              </button>
+                          </div>
+                      ))}
+                  </div>
 
                   {/* Settings */}
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -287,20 +335,30 @@ const App: React.FC = () => {
 
               {/* Bottom Actions */}
               <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-20">
-                  <div className="flex gap-2 mb-3">
-                      <Button variant="secondary" onClick={() => setView(ViewState.CAMERA)} className="flex-1 py-4 text-sm" disabled={stagingImages.length >= 30}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {/* Action Buttons Row */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                      <Button variant="secondary" onClick={() => setView(ViewState.CAMERA)} className="py-3 text-xs flex-col h-auto gap-1" disabled={stagingImages.length >= 10}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         Kamera
                       </Button>
-                      <Button variant="secondary" onClick={() => fileInputRef.current?.click()} className="flex-1 py-4 text-sm" disabled={stagingImages.length >= 30}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      
+                      <Button variant="secondary" onClick={() => fileInputRef.current?.click()} className="py-3 text-xs flex-col h-auto gap-1" disabled={stagingImages.length >= 10}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                         </svg>
                         Upload
                       </Button>
+
+                      <Button variant="secondary" onClick={() => setShowTextModal(true)} className="py-3 text-xs flex-col h-auto gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Tulis Soal
+                      </Button>
+                      
                       <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -310,13 +368,14 @@ const App: React.FC = () => {
                         onChange={handleFileUpload}
                       />
                   </div>
+                  
                   <Button 
                     fullWidth 
                     onClick={handleProcessStaging} 
-                    disabled={stagingImages.length === 0}
+                    disabled={stagingImages.length === 0 && stagingTexts.length === 0}
                     className="py-4 text-lg shadow-xl shadow-indigo-100"
                   >
-                      Kerjakan Soal ({stagingImages.length})
+                      Kerjakan Soal ({stagingImages.length + stagingTexts.length})
                   </Button>
               </div>
           </div>
@@ -349,25 +408,38 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-24">
-          {/* Images Section (Horizontal Scroll if multiple) */}
-          <div className="bg-gray-100 p-4">
-             <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
-                 {/* SAFE GUARD: Use optional chaining to prevent crash on undefined images */}
-                 {Array.isArray(selectedScan.images) && selectedScan.images.length > 0 ? (
-                    selectedScan.images.map((img, i) => (
-                        <img 
-                            key={i}
-                            src={img} 
-                            alt={`Soal ${i+1}`} 
-                            className="h-64 rounded-lg shadow-md border border-gray-300 object-contain bg-white snap-center"
-                        />
-                    ))
-                 ) : (
-                    <div className="h-32 w-full flex items-center justify-center text-gray-400 text-sm">Gambar tidak tersedia (Corrupt Data)</div>
-                 )}
-             </div>
-             {Array.isArray(selectedScan.images) && selectedScan.images.length > 1 && (
-                 <p className="text-center text-xs text-gray-500 mt-2">Geser untuk melihat semua foto soal</p>
+          
+          {/* Input Section (Images and/or Text) */}
+          <div className="bg-gray-100 border-b border-gray-200">
+             
+             {/* Text Inputs List */}
+             {selectedScan.textInputs && selectedScan.textInputs.length > 0 && (
+                 <div className="p-4 space-y-2 pb-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Soal Teks:</p>
+                    {selectedScan.textInputs.map((text, idx) => (
+                        <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 text-sm text-gray-800 shadow-sm">
+                            <span className="font-bold text-indigo-600 mr-2">#{idx+1}</span>
+                            {text}
+                        </div>
+                    ))}
+                 </div>
+             )}
+
+             {/* Images List (Horizontal Scroll) */}
+             {Array.isArray(selectedScan.images) && selectedScan.images.length > 0 && (
+                <div className="p-4 pt-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Foto Soal:</p>
+                    <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+                        {selectedScan.images.map((img, i) => (
+                            <img 
+                                key={i}
+                                src={img} 
+                                alt={`Soal ${i+1}`} 
+                                className="h-48 rounded-lg shadow-sm border border-gray-300 object-contain bg-white snap-center"
+                            />
+                        ))}
+                    </div>
+                 </div>
              )}
           </div>
 
@@ -475,8 +547,8 @@ const App: React.FC = () => {
                             onClick={() => { setSelectedScan(scan); setView(ViewState.SOLUTION); }}
                             className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow cursor-pointer active:bg-gray-50"
                         >
-                            <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
-                                {/* Extra Safe Guard against corrupt data */}
+                            <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative flex items-center justify-center text-gray-400">
+                                {/* Thumbnail Logic: Image > Text Icon > Fallback */}
                                 {Array.isArray(scan.images) && scan.images.length > 0 ? (
                                     <>
                                         <img 
@@ -484,14 +556,26 @@ const App: React.FC = () => {
                                             className="w-full h-full object-cover" 
                                             alt="thumbnail" 
                                         />
-                                        {scan.images.length > 1 && (
+                                        {(scan.images.length > 1 || (scan.textInputs && scan.textInputs.length > 0)) && (
                                             <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">
-                                                +{scan.images.length - 1}
+                                                +{ (scan.images.length - 1) + (scan.textInputs?.length || 0) }
                                             </div>
                                         )}
                                     </>
+                                ) : (scan.textInputs && scan.textInputs.length > 0) ? (
+                                    <div className="flex flex-col items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span className="text-[10px] mt-1">Teks</span>
+                                        {scan.textInputs.length > 1 && (
+                                            <div className="absolute bottom-0 right-0 bg-indigo-500 text-white text-[10px] px-1 rounded-tl">
+                                                +{scan.textInputs.length - 1}
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Img</div>
+                                    <span className="text-xs">No Data</span>
                                 )}
                             </div>
                             <div className="flex-1 flex flex-col justify-center">

@@ -3,12 +3,16 @@ import { ExplanationStyle } from "../types";
 
 export const solveMathProblem = async (
   images: string[], 
+  textInputs: string[] = [], // New parameter
   apiKey: string,
   style: ExplanationStyle
 ): Promise<string> => {
   try {
     if (!apiKey) throw new Error("API Key tidak ditemukan.");
-    if (!images || images.length === 0) throw new Error("Tidak ada gambar untuk diproses.");
+    // Update validation: allow logic if EITHER images OR text exists
+    if ((!images || images.length === 0) && (!textInputs || textInputs.length === 0)) {
+        throw new Error("Mohon masukkan gambar atau teks soal untuk diproses.");
+    }
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -29,7 +33,7 @@ export const solveMathProblem = async (
 
     const prompt = `
       Kamu adalah asisten ahli matematika yang sangat cerdas.
-      Tugasmu adalah menganalisa gambar-gambar soal matematika yang diberikan dan memberikan solusinya.
+      Tugasmu adalah menganalisa soal matematika yang diberikan (baik berupa gambar maupun teks) dan memberikan solusinya.
       
       Instruksi Gaya Jawaban: ${styleInstruction}
 
@@ -40,32 +44,44 @@ export const solveMathProblem = async (
       4. Gunakan Markdown standard untuk judul (##) dan bold (**teks**).
 
       Format Output Jawaban:
-      1. **Analisis Soal**: Tulis ulang apa yang diketahui dan ditanya dari soal.
+      1. **Analisis Soal**: Tulis ulang apa yang diketahui dan ditanya dari soal (gabungkan informasi dari gambar dan teks jika ada).
       2. **Langkah Penyelesaian**: Jelaskan tahap demi tahap dengan jelas.
       3. **Jawaban Akhir**: Tulis jawaban akhir dengan jelas dan cetak TEBAL.
 
       Bahasa: Bahasa Indonesia.
     `;
 
-    // Prepare content parts for multiple images
-    const imageParts = images.map(img => {
-      // Clean base64 header if exists
-      const cleanBase64 = img.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-      return {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: cleanBase64
-        }
-      };
-    });
+    const contentParts: any[] = [];
+
+    // 1. Add Image Parts
+    if (images && images.length > 0) {
+        images.forEach(img => {
+            const cleanBase64 = img.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+            contentParts.push({
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: cleanBase64
+                }
+            });
+        });
+    }
+
+    // 2. Add Text Question Parts
+    if (textInputs && textInputs.length > 0) {
+        textInputs.forEach((text, index) => {
+            contentParts.push({
+                text: `[Input Soal Teks #${index + 1}]: ${text}`
+            });
+        });
+    }
+
+    // 3. Add System Prompt
+    contentParts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
       model: 'gemini-flash-lite-latest',
       contents: {
-        parts: [
-          ...imageParts,
-          { text: prompt }
-        ]
+        parts: contentParts
       }
     });
 
