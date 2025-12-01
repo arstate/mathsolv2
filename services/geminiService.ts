@@ -1,59 +1,75 @@
-import { GoogleGenAI } from "@google/genai";
-import { ExplanationStyle } from "../types";
 
-export const solveMathProblem = async (
+import { GoogleGenAI } from "@google/genai";
+import { ExplanationStyle, EducationLevel, Subject } from "../types";
+
+export const solveGeneralProblem = async (
   images: string[], 
-  textInputs: string[] = [], // New parameter
+  textInputs: string[],
   apiKey: string,
-  style: ExplanationStyle
+  style: ExplanationStyle,
+  level: EducationLevel,
+  subject: Subject
 ): Promise<string> => {
   try {
     if (!apiKey) throw new Error("API Key tidak ditemukan.");
-    // Update validation: allow logic if EITHER images OR text exists
     if ((!images || images.length === 0) && (!textInputs || textInputs.length === 0)) {
-        throw new Error("Mohon masukkan gambar atau teks soal untuk diproses.");
+        throw new Error("Mohon masukkan gambar atau teks soal.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    // Define style instruction
-    let styleInstruction = "";
-    switch (style) {
-      case 'brief':
-        styleInstruction = "Berikan penjelasan yang singkat, padat, dan langsung pada intinya. Jangan terlalu bertele-tele.";
-        break;
-      case 'direct':
-        styleInstruction = "Hanya berikan jawaban akhir (kunci jawaban) saja. Jangan berikan penjelasan langkah-langkah.";
-        break;
-      case 'detailed':
-      default:
-        styleInstruction = "Berikan langkah-langkah penyelesaian yang sangat rinci, jabarkan setiap konsep, rumus yang digunakan, dan logika di balik setiap langkah.";
-        break;
+    // 1. Build Context Prompt based on inputs
+    let contextPrompt = "Peranmu adalah 'Asisten Belajar Pribadi' yang sangat cerdas dan suportif.";
+    
+    // Adjust tone based on Education Level
+    if (level === 'TK' || level === 'SD') {
+        contextPrompt += ` Tingkat pendidikan pengguna adalah ${level}. Gunakan bahasa yang sangat sederhana, ceria, mudah dipahami anak-anak, dan analogi sehari-hari. Hindari istilah teknis yang rumit.`;
+    } else if (level === 'SMP') {
+        contextPrompt += ` Tingkat pendidikan pengguna adalah SMP. Gunakan bahasa yang jelas, terstruktur, namun tetap santai.`;
+    } else if (level === 'SMA/SMK') {
+        contextPrompt += ` Tingkat pendidikan pengguna adalah SMA/SMK. Berikan penjelasan akademis yang tepat namun mudah dicerna.`;
+    } else if (level === 'Kuliah (S1/D4)') {
+        contextPrompt += ` Tingkat pendidikan pengguna adalah Mahasiswa (Kuliah). Gunakan gaya bahasa akademis, formal, kritis, dan mendalam.`;
+    } else {
+        contextPrompt += ` Sesuaikan tingkat kesulitan bahasa berdasarkan kompleksitas soal yang terdeteksi (Auto-detect level).`;
     }
 
+    // Adjust instruction based on Subject
+    if (subject !== 'Auto') {
+        contextPrompt += ` Mata pelajaran fokus saat ini adalah: ${subject}.`;
+    } else {
+        contextPrompt += ` Analisislah soal untuk mendeteksi mata pelajaran secara otomatis.`;
+    }
+
+    // Adjust style
+    let styleInstruction = "";
+    if (style === 'brief') styleInstruction = "Jawab dengan ringkas dan padat.";
+    else if (style === 'direct') styleInstruction = "Langsung berikan kunci jawaban atau poin utamanya saja.";
+    else styleInstruction = "Berikan penjelasan langkah demi langkah yang komprehensif. Jika soal esai, berikan argumen yang kuat.";
+
     const prompt = `
-      Kamu adalah asisten ahli matematika yang sangat cerdas.
-      Tugasmu adalah menganalisa soal matematika yang diberikan (baik berupa gambar maupun teks) dan memberikan solusinya.
+      ${contextPrompt}
       
-      Instruksi Gaya Jawaban: ${styleInstruction}
+      Instruksi Output: ${styleInstruction}
 
-      PENTING - Format Penulisan Matematika (LaTeX):
-      1. Gunakan simbol '$' tunggal untuk matematika dalam baris (inline). Contoh: $x^2 + 5$.
-      2. Gunakan simbol '$$' ganda untuk matematika blok (display/persamaan terpisah). Contoh: $$ \\frac{a}{b} = c $$.
-      3. JANGAN gunakan tanda kurung siku '\\[' atau '\\(' untuk LaTeX. Gunakan tanda dollar ($).
-      4. Gunakan Markdown standard untuk judul (##) dan bold (**teks**).
+      PENTING - Format Penulisan:
+      1. Jika ada rumus matematika/fisika/kimia, WAJIB gunakan LaTeX format:
+         - Inline: $E = mc^2$
+         - Block: $$ x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a} $$
+      2. Gunakan Markdown standard (Bold **teks**, Heading ##, List -).
+      3. Jangan gunakan tag HTML.
 
-      Format Output Jawaban:
-      1. **Analisis Soal**: Tulis ulang apa yang diketahui dan ditanya dari soal (gabungkan informasi dari gambar dan teks jika ada).
-      2. **Langkah Penyelesaian**: Jelaskan tahap demi tahap dengan jelas.
-      3. **Jawaban Akhir**: Tulis jawaban akhir dengan jelas dan cetak TEBAL.
-
+      Struktur Jawaban (Sesuaikan dengan tipe soal):
+      - Jika soal hitungan: Diketahui -> Ditanya -> Langkah Penyelesaian -> Jawaban Akhir.
+      - Jika soal hafalan/teori: Ringkasan Konsep -> Penjelasan Detail -> Kesimpulan.
+      - Jika soal bahasa: Terjemahan/Analisis -> Penjelasan Grammar/Konteks.
+      
       Bahasa: Bahasa Indonesia.
     `;
 
     const contentParts: any[] = [];
 
-    // 1. Add Image Parts
+    // Add Images
     if (images && images.length > 0) {
         images.forEach(img => {
             const cleanBase64 = img.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
@@ -66,16 +82,15 @@ export const solveMathProblem = async (
         });
     }
 
-    // 2. Add Text Question Parts
+    // Add Texts
     if (textInputs && textInputs.length > 0) {
         textInputs.forEach((text, index) => {
             contentParts.push({
-                text: `[Input Soal Teks #${index + 1}]: ${text}`
+                text: `[Pertanyaan/Konteks #${index + 1}]: ${text}`
             });
         });
     }
 
-    // 3. Add System Prompt
     contentParts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
@@ -85,9 +100,9 @@ export const solveMathProblem = async (
       }
     });
 
-    return response.text || "Maaf, saya tidak dapat menghasilkan jawaban saat ini.";
+    return response.text || "Maaf, AI tidak memberikan respons. Coba ulangi.";
   } catch (error) {
     console.error("Error calling Gemini:", error);
-    return "Maaf, terjadi kesalahan saat menghubungkan ke kecerdasan AI. Periksa kembali API Key Anda atau koneksi internet.";
+    return "Maaf, terjadi kesalahan koneksi ke AI. Periksa internet atau API Key Anda.";
   }
 };

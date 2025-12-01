@@ -1,6 +1,6 @@
 {
-  "name": "Matematika Pintar AI2",
-  "description": "Aplikasi pemecah soal matematika berbasis AI menggunakan kamera dan Gemini.",
+  "name": "Tanya AI - Asisten Belajar",
+  "description": "Aplikasi penjawab soal semua mata pelajaran berbasis AI (SD, SMP, SMA, Kuliah).",
   "requestFramePermissions": [
     "camera"
   ]

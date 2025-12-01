@@ -1,6 +1,33 @@
-import { ScanResult } from '../types';
 
-const STORAGE_KEY = 'math_solver_scans';
+import { ScanResult, EducationLevel, Subject } from '../types';
+
+const STORAGE_KEY = 'edu_solver_scans';
+const PREF_KEY = 'edu_solver_prefs';
+
+export interface UserPreferences {
+  level: EducationLevel;
+  subject: Subject;
+}
+
+// --- Preferences ---
+
+export const saveUserPreferences = (prefs: UserPreferences) => {
+  localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+};
+
+export const getUserPreferences = (): UserPreferences => {
+  try {
+    const stored = localStorage.getItem(PREF_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) { console.error(e); }
+  
+  // Default values
+  return { level: 'Auto', subject: 'Auto' };
+};
+
+// --- Scans ---
 
 export const getScans = (): ScanResult[] => {
   try {
@@ -10,32 +37,31 @@ export const getScans = (): ScanResult[] => {
     const parsed = JSON.parse(stored);
 
     if (Array.isArray(parsed)) {
-      // Filter out nulls and fix structure
       return parsed
         .filter((item) => item !== null && typeof item === 'object')
         .map((item: any) => {
-          // Force 'images' to be an array
           let fixedImages: string[] = [];
           
           if (Array.isArray(item.images)) {
              fixedImages = item.images;
           } else if (typeof item.imageUrl === 'string') {
-             fixedImages = [item.imageUrl]; // Migrate old single image
+             fixedImages = [item.imageUrl];
           }
 
           return {
              ...item,
              images: fixedImages,
-             // Ensure ID exists
              id: item.id || Date.now().toString() + Math.random().toString(),
-             timestamp: item.timestamp || Date.now()
+             timestamp: item.timestamp || Date.now(),
+             // Backward compatibility defaults
+             educationLevel: item.educationLevel || 'Auto',
+             subject: item.subject || 'Auto'
           };
       });
     }
     return [];
   } catch (e) {
-    console.error("Gagal memuat riwayat (Data Corrupt):", e);
-    // Auto-clear corrupt data to fix white screen loop
+    console.error("Gagal memuat riwayat:", e);
     localStorage.removeItem(STORAGE_KEY);
     return [];
   }
@@ -44,17 +70,14 @@ export const getScans = (): ScanResult[] => {
 export const saveScan = (scan: ScanResult): void => {
   try {
     const currentScans = getScans();
-    const updatedScans = [scan, ...currentScans].slice(0, 30); // Limit to 30 items
+    const updatedScans = [scan, ...currentScans].slice(0, 50); // Increased limit slightly
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedScans));
   } catch (e) {
     console.error("Gagal menyimpan riwayat:", e);
-    // If quota exceeded, try clearing old data
     try {
         const minimalScans = [scan];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalScans));
-    } catch(err) {
-        console.error("Critical storage failure");
-    }
+    } catch(err) {}
   }
 };
 
