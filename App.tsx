@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CameraCapture } from './components/CameraCapture';
 import { Button } from './components/Button';
+import { ApiKeyInput } from './components/ApiKeyInput';
 import { ScanResult, ViewState } from './types';
 import { getScans, saveScan, updateScan, deleteScan } from './services/storageService';
 import { solveMathProblem } from './services/geminiService';
@@ -9,17 +10,42 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LIST);
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [selectedScan, setSelectedScan] = useState<ScanResult | null>(null);
+  
+  // API Key State
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isCheckingKey, setIsCheckingKey] = useState(true);
 
-  // Load history on mount
+  // Load history and key on mount
   useEffect(() => {
     setScans(getScans());
+    
+    const storedKey = localStorage.getItem('gemini_api_key');
+    if (storedKey) {
+      setApiKey(storedKey);
+    }
+    setIsCheckingKey(false);
   }, []);
+
+  const handleSaveKey = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+    setApiKey(key);
+  };
+
+  const handleResetKey = () => {
+    if (confirm("Apakah Anda yakin ingin menghapus API Key? Anda harus memasukkannya lagi nanti.")) {
+        localStorage.removeItem('gemini_api_key');
+        setApiKey(null);
+        setView(ViewState.LIST);
+    }
+  };
 
   const handleStartCamera = () => {
     setView(ViewState.CAMERA);
   };
 
   const handleCapture = async (imageData: string) => {
+    if (!apiKey) return;
+
     // Create initial scan object
     const newId = Date.now().toString();
     const newScan: ScanResult = {
@@ -39,13 +65,12 @@ const App: React.FC = () => {
 
     // Trigger AI processing
     try {
-      const solution = await solveMathProblem(imageData);
+      // Pass the API key explicitly
+      const solution = await solveMathProblem(imageData, apiKey);
       
       const updates = { 
         solution, 
         loading: false,
-        // Optional: We could try to extract question text from the response if we parsed it, 
-        // but typically Gemini just gives the solution.
       };
       
       updateScan(newId, updates);
@@ -82,6 +107,15 @@ const App: React.FC = () => {
   };
 
   // --- RENDER VIEWS ---
+
+  if (isCheckingKey) {
+    return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>;
+  }
+
+  // Show Onboarding if no key
+  if (!apiKey) {
+    return <ApiKeyInput onSave={handleSaveKey} />;
+  }
 
   if (view === ViewState.CAMERA) {
     return (
@@ -175,12 +209,24 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-lg mx-auto shadow-2xl">
         {/* Top Bar */}
-        <div className="bg-white px-6 py-5 shadow-sm border-b border-gray-200 z-10 sticky top-0">
-            <div className="flex items-center justify-between mb-1">
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Matematika Pintar</h1>
-                <div className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">BETA</div>
+        <div className="bg-white px-6 py-5 shadow-sm border-b border-gray-200 z-10 sticky top-0 flex justify-between items-center">
+            <div>
+                <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Matematika Pintar</h1>
+                    <div className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">BETA</div>
+                </div>
+                <p className="text-gray-500 text-sm">Asisten PR Matematika Pribadimu</p>
             </div>
-            <p className="text-gray-500 text-sm">Asisten PR Matematika Pribadimu</p>
+            
+            <button 
+                onClick={handleResetKey}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Ganti API Key"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+            </button>
         </div>
 
         {/* Content */}

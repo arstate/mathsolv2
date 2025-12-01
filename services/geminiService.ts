@@ -1,11 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize the client
-// NOTE: process.env.API_KEY is handled by the build system/Vercel
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Removed global initialization to prevent startup crashes if key is missing
+// const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const solveMathProblem = async (base64Image: string): Promise<string> => {
+export const solveMathProblem = async (base64Image: string, apiKey: string): Promise<string> => {
   try {
+    if (!apiKey) throw new Error("API Key tidak ditemukan.");
+
+    // Initialize client dynamically with the user's key
+    const ai = new GoogleGenAI({ apiKey });
+
     // Clean the base64 string if it contains the header
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
@@ -41,6 +45,6 @@ export const solveMathProblem = async (base64Image: string): Promise<string> => 
     return response.text || "Maaf, saya tidak dapat menghasilkan jawaban saat ini.";
   } catch (error) {
     console.error("Error calling Gemini:", error);
-    return "Maaf, terjadi kesalahan saat menghubungkan ke kecerdasan AI. Pastikan koneksi internet lancar atau coba lagi nanti.";
+    return "Maaf, terjadi kesalahan saat menghubungkan ke kecerdasan AI. Periksa kembali API Key Anda atau koneksi internet.";
   }
 };
